@@ -8,6 +8,7 @@ from moses.interfaces import MosesTrainer
 from moses.utils import OneHotVocab, Logger, CircularBuffer
 from moses.vae.misc import CosineAnnealingLRWithRestart, KLAnnealer
 
+
 class VAETrainer(MosesTrainer):
     def __init__(self, config):
         self.config = config
@@ -20,8 +21,7 @@ class VAETrainer(MosesTrainer):
 
         def collate(data):
             data.sort(key=len, reverse=True)
-            tensors = [model.string2tensor(string, device=device)
-                       for string in data]
+            tensors = [model.string2tensor(string, device=device) for string in data]
 
             return tensors
 
@@ -47,36 +47,36 @@ class VAETrainer(MosesTrainer):
             if optimizer is not None:
                 optimizer.zero_grad()
                 loss.backward()
-                clip_grad_norm_(self.get_optim_params(model),
-                                self.config.clip_grad)
+                clip_grad_norm_(self.get_optim_params(model), self.config.clip_grad)
                 optimizer.step()
 
             # Log
             kl_loss_values.add(kl_loss.item())
             recon_loss_values.add(recon_loss.item())
             loss_values.add(loss.item())
-            lr = (optimizer.param_groups[0]['lr']
-                  if optimizer is not None
-                  else 0)
+            lr = optimizer.param_groups[0]["lr"] if optimizer is not None else 0
 
             # Update tqdm
             kl_loss_value = kl_loss_values.mean()
             recon_loss_value = recon_loss_values.mean()
             loss_value = loss_values.mean()
-            postfix = [f'loss={loss_value:.5f}',
-                       f'(kl={kl_loss_value:.5f}',
-                       f'recon={recon_loss_value:.5f})',
-                       f'klw={kl_weight:.5f} lr={lr:.5f}']
-            tqdm_data.set_postfix_str(' '.join(postfix))
+            postfix = [
+                f"loss={loss_value:.5f}",
+                f"(kl={kl_loss_value:.5f}",
+                f"recon={recon_loss_value:.5f})",
+                f"klw={kl_weight:.5f} lr={lr:.5f}",
+            ]
+            tqdm_data.set_postfix_str(" ".join(postfix))
 
         postfix = {
-            'epoch': epoch,
-            'kl_weight': kl_weight,
-            'lr': lr,
-            'kl_loss': kl_loss_value,
-            'recon_loss': recon_loss_value,
-            'loss': loss_value,
-            'mode': 'Eval' if optimizer is None else 'Train'}
+            "epoch": epoch,
+            "kl_weight": kl_weight,
+            "lr": lr,
+            "kl_loss": kl_loss_value,
+            "recon_loss": recon_loss_value,
+            "loss": loss_value,
+            "mode": "Eval" if optimizer is None else "Train",
+        }
 
         return postfix
 
@@ -87,38 +87,37 @@ class VAETrainer(MosesTrainer):
         device = model.device
         n_epoch = self._n_epoch()
 
-        optimizer = optim.Adam(self.get_optim_params(model),
-                               lr=self.config.lr_start)
+        optimizer = optim.Adam(self.get_optim_params(model), lr=self.config.lr_start)
         kl_annealer = KLAnnealer(n_epoch, self.config)
-        lr_annealer = CosineAnnealingLRWithRestart(optimizer,
-                                                   self.config)
+        lr_annealer = CosineAnnealingLRWithRestart(optimizer, self.config)
 
         model.zero_grad()
         for epoch in range(n_epoch):
             # Epoch start
             kl_weight = kl_annealer(epoch)
-            tqdm_data = tqdm(train_loader,
-                             desc='Training (epoch #{})'.format(epoch))
-            postfix = self._train_epoch(model, epoch,
-                                        tqdm_data, kl_weight, optimizer)
+            tqdm_data = tqdm(train_loader, desc="Training (epoch #{})".format(epoch))
+            postfix = self._train_epoch(model, epoch, tqdm_data, kl_weight, optimizer)
             if logger is not None:
                 logger.append(postfix)
                 logger.save(self.config.log_file)
 
             if val_loader is not None:
-                tqdm_data = tqdm(val_loader,
-                                 desc='Validation (epoch #{})'.format(epoch))
+                tqdm_data = tqdm(
+                    val_loader, desc="Validation (epoch #{})".format(epoch)
+                )
                 postfix = self._train_epoch(model, epoch, tqdm_data, kl_weight)
                 if logger is not None:
                     logger.append(postfix)
                     logger.save(self.config.log_file)
 
-            if (self.config.model_save is not None) and \
-                    (epoch % self.config.save_frequency == 0):
-                model = model.to('cpu')
-                torch.save(model.state_dict(),
-                           self.config.model_save[:-3] +
-                           '_{0:03d}.pt'.format(epoch))
+            if (self.config.model_save is not None) and (
+                epoch % self.config.save_frequency == 0
+            ):
+                model = model.to("cpu")
+                torch.save(
+                    model.state_dict(),
+                    self.config.model_save[:-3] + "_{0:03d}.pt".format(epoch),
+                )
                 model = model.to(device)
 
             # Epoch end
@@ -128,8 +127,10 @@ class VAETrainer(MosesTrainer):
         logger = Logger() if self.config.log_file is not None else None
 
         train_loader = self.get_dataloader(model, train_data, shuffle=True)
-        val_loader = None if val_data is None else self.get_dataloader(
-            model, val_data, shuffle=False
+        val_loader = (
+            None
+            if val_data is None
+            else self.get_dataloader(model, val_data, shuffle=False)
         )
 
         self._train(model, train_loader, val_loader, logger)
@@ -137,6 +138,6 @@ class VAETrainer(MosesTrainer):
 
     def _n_epoch(self):
         return sum(
-            self.config.lr_n_period * (self.config.lr_n_mult ** i)
+            self.config.lr_n_period * (self.config.lr_n_mult**i)
             for i in range(self.config.lr_n_restarts)
         )

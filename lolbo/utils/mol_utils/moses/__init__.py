@@ -7,7 +7,7 @@ from .organ import ORGAN, ORGANTrainer, organ_parser
 from .char_rnn import CharRNN, CharRNNTrainer, char_rnn_parser
 
 
-__version__ = '0.3.1'
+__version__ = "0.3.1"
 __all__ = [
     "VAE",
     "VAETrainer",
@@ -24,5 +24,5 @@ __all__ = [
     "get_dataset",
     "get_all_metrics",
     "CharVocab",
-    "StringDataset"
+    "StringDataset",
 ]
