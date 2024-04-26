@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import torch
 import math
@@ -15,7 +14,7 @@ def load_molecule_train_data(
     df = df[0:num_initialization_points]
     train_x_smiles = df["smile"].values.tolist()
     train_x_selfies = df["selfie"].values.tolist()
-    train_y = torch.from_numpy(df[task_id].values).float()
+    train_y = torch.from_numpy(df[str(task_id)].values).float()
     train_y = train_y.unsqueeze(-1)
     train_z = load_train_z(
         num_initialization_points=num_initialization_points,
@@ -41,7 +40,7 @@ def load_train_z(
         zs = zs[0:num_initialization_points]
         zs = torch.from_numpy(zs).float()
     # otherwisee, set zs to None
-    except:
+    except:  # noqa: E722
         zs = None
 
     return zs

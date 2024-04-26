@@ -8,13 +8,7 @@ from lolbo.utils.mol_utils.selfies_vae.model_positional_unbounded import (
 )
 from lolbo.utils.mol_utils.selfies_vae.data import collate_fn
 from lolbo.latent_space_objective import LatentSpaceObjective
-from lolbo.utils.mol_utils.mol_utils import GUACAMOL_TASK_NAMES
-import pkg_resources
-
-# make sure molecule software versions are correct:
-assert pkg_resources.get_distribution("selfies").version == "2.0.0"
-assert pkg_resources.get_distribution("rdkit-pypi").version == "2022.3.1"
-assert pkg_resources.get_distribution("molsets").version == "0.3.1"
+from lolbo.utils.mol_utils.mol_utils import DRUGS
 
 
 class MoleculeObjective(LatentSpaceObjective):
@@ -23,14 +17,14 @@ class MoleculeObjective(LatentSpaceObjective):
 
     def __init__(
         self,
-        task_id="pdop",
+        task_id=1,
         path_to_vae_statedict="../lolbo/utils/mol_utils/selfies_vae/state_dict/SELFIES-VAE-state-dict.pt",
         xs_to_scores_dict={},
         max_string_length=1024,
         num_calls=0,
         smiles_to_selfies={},
     ):
-        assert task_id in GUACAMOL_TASK_NAMES + ["logp"]
+        assert task_id in range(len(DRUGS))
 
         self.dim = 256  # SELFIES VAE DEFAULT LATENT SPACE DIM
         self.path_to_vae_statedict = (
@@ -119,7 +113,7 @@ class MoleculeObjective(LatentSpaceObjective):
             try:
                 # avoid re-computing mapping from smiles to selfies to save time
                 selfie = self.smiles_to_selfies[smile]
-            except:
+            except:  # noqa: E722
                 selfie = sf.encoder(smile)
                 self.smiles_to_selfies[smile] = selfie
             tokenized_selfie = self.dataobj.tokenize_selfies([selfie])[0]
