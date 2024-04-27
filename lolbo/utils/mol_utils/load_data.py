@@ -46,6 +46,7 @@ def load_train_z(
     return zs
 
 
+@torch.no_grad()
 def compute_train_zs(mol_objective, init_train_x, bsz=64):
     init_zs = []
     # make sure vae is in eval mode
