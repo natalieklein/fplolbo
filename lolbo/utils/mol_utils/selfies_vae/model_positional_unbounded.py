@@ -7,6 +7,7 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 from lolbo.utils.mol_utils.selfies_vae.data import SELFIESDataModule, SELFIESDataset
 from torch.optim import Adam
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
 BATCH_SIZE = 256
 ENCODER_LR = 1e-3
@@ -30,18 +31,11 @@ def gumbel_softmax(
     tau: float = 1,
     hard: bool = False,
     dim: int = -1,
-    return_randoms: bool = False,
-    randoms: Tensor = None,
 ) -> Tensor:
     """
     Mostly from https://pytorch.org/docs/stable/_modules/torch/nn/functional.html#gumbel_softmax
     """
-    if randoms is None:
-        randoms = (
-            -torch.empty_like(logits, memory_format=torch.legacy_contiguous_format)
-            .exponential_()
-            .log()
-        )  # ~Gumbel(0,1)
+    randoms = -torch.empty_like(logits).exponential_().log()  # ~Gumbel(0,1)
     gumbels = (logits + randoms) / tau  # ~Gumbel(logits,tau)
     y_soft = gumbels.softmax(dim)
 
@@ -56,10 +50,7 @@ def gumbel_softmax(
         # Reparametrization trick.
         ret = y_soft
 
-    if return_randoms:
-        return ret, randoms
-    else:
-        return ret
+    return ret
 
 
 class PositionalEncoding(nn.Module):
@@ -216,10 +207,12 @@ class InfoTransformerVAE(pl.LightningModule):
         embed = self.decoder_position_encoding(embed)
 
         # TODO: Mask out all stop tokens but the first?
-        tgt_mask = nn.Transformer.generate_square_subsequent_mask(embed.shape[1]).to(
-            self.device
+        tgt_mask = nn.Transformer.generate_square_subsequent_mask(
+            embed.shape[1], device=self.device
         )
-        decoding = self.decoder(tgt=embed, memory=z, tgt_mask=tgt_mask)
+        decoding = self.decoder(
+            tgt=embed, memory=z, tgt_mask=tgt_mask, tgt_is_causal=True
+        )
         logits = decoding @ self.decoder_token_unembedding
 
         return logits
@@ -229,8 +222,6 @@ class InfoTransformerVAE(pl.LightningModule):
         self,
         n: int = -1,
         z: Tensor = None,
-        differentiable: bool = False,
-        return_logits: bool = False,
     ):
         model_state = self.training
         self.eval()
@@ -242,24 +233,22 @@ class InfoTransformerVAE(pl.LightningModule):
         tokens = torch.zeros(
             n, 1, device=self.device
         ).long()  # Start token is 0, stop token is 1
-        random_gumbels = torch.zeros(n, 0, self.vocab_size, device=self.device)
         while True:  # Loop until every molecule hits a stop token
             tgt = self.decoder_token_embedding(tokens)
             tgt = self.decoder_position_encoding(tgt)
             tgt_mask = nn.Transformer.generate_square_subsequent_mask(
-                tokens.shape[-1]
-            ).to(self.device)
+                tokens.shape[-1], device=self.device
+            )
 
-            decoding = self.decoder(tgt=tgt, memory=z, tgt_mask=tgt_mask)
+            with sdpa_kernel(SDPBackend.FLASH_ATTENTION), torch.cuda.amp.autocast():
+                decoding = self.decoder(
+                    tgt=tgt, memory=z, tgt_mask=tgt_mask, tgt_is_causal=True
+                )[:, -1:, :]
+
             logits = decoding @ self.decoder_token_unembedding
-            sample, randoms = gumbel_softmax(
-                logits, dim=-1, hard=True, return_randoms=True
-            )
+            sample = gumbel_softmax(logits, dim=-1, hard=True)
 
-            tokens = torch.cat(
-                [tokens, sample[:, -1, :].argmax(dim=-1)[:, None]], dim=-1
-            )
-            random_gumbels = torch.cat([random_gumbels, randoms], dim=1)
+            tokens = torch.cat([tokens, sample.argmax(dim=-1)], dim=-1)
 
             # 1 is the stop token. Check if all molecules have a stop token in them
             if (
@@ -270,14 +259,7 @@ class InfoTransformerVAE(pl.LightningModule):
 
         self.train(model_state)
 
-        # TODO: Put this back in
-        if not differentiable:
-            sample = tokens
-
-        if return_logits:
-            return sample, logits
-        else:
-            return sample
+        return tokens
 
     def is_valid(self, x):
         device = x.device

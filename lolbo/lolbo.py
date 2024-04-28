@@ -208,9 +208,9 @@ class LOLBOState:
             for batch_ix in range(num_batches):
                 start_idx, stop_idx = batch_ix * bsz, (batch_ix + 1) * bsz
                 batch_list = train_x[start_idx:stop_idx]
-                with torch.no_grad():
+                with torch.no_grad(), torch.cuda.amp.autocast():
                     z, _ = self.objective.vae_forward(batch_list)
-                out_dict = self.objective(z)
+                    out_dict = self.objective(z)
                 scores_arr = out_dict["scores"]
                 valid_zs = out_dict["valid_zs"]
                 selfies_list = out_dict["decoded_xs"]

@@ -150,11 +150,7 @@ class Optimize(object):
         return self
 
     def set_seed(self):
-        # The flag below controls whether to allow TF32 on matmul. This flag defaults to False
-        # in PyTorch 1.12 and later.
-        torch.backends.cuda.matmul.allow_tf32 = False
-        # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
-        torch.backends.cudnn.allow_tf32 = False
+        torch.set_float32_matmul_precision("highest")
         if self.seed is not None:
             torch.manual_seed(self.seed)
             random.seed(self.seed)
@@ -162,8 +158,6 @@ class Optimize(object):
             torch.cuda.manual_seed(self.seed)
             torch.cuda.manual_seed(self.seed)
             torch.cuda.manual_seed_all(self.seed)
-            torch.backends.cudnn.benchmark = False
-            torch.backends.cudnn.deterministic = True
             os.environ["PYTHONHASHSEED"] = str(self.seed)
 
         return self
@@ -225,6 +219,10 @@ class Optimize(object):
                     print("\nNew best found:")
                     self.print_progress_update()
                 self.lolbo_state.new_best_found = False
+
+            max_bytes = torch.cuda.max_memory_allocated(torch.device("cuda"))
+            max_gbytes = max_bytes / 1_000_000_000
+            print(f"Max GPU Memory Usage: {max_gbytes:.2f} GB")
 
         # if verbose, print final results
         if self.verbose:
