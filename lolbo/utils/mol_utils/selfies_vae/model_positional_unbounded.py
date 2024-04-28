@@ -188,7 +188,7 @@ class InfoTransformerVAE(pl.LightningModule):
             mu = mu[:, : self.bottleneck_size, :]
             sigma = sigma[:, : self.bottleneck_size, :]
 
-        return mu, sigma
+        return mu.float(), sigma.float()
 
     def decode(self, z, tokens, as_probs=False):
         if as_probs:
