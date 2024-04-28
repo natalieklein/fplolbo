@@ -311,10 +311,13 @@ def smiles_to_desired_scores(smiles_list, task_id: int) -> list:
     scores = []
     targ_fp = get_fingerprint(DRUGS[task_id])
     for smiles_str in smiles_list:
-        smiles_fp = get_fingerprint(smiles_str)
-
-        sim = DataStructs.FingerprintSimilarity(targ_fp, smiles_fp)
-        scores.append(sim)
+        try:
+            smiles_fp = get_fingerprint(smiles_str)
+     
+            sim = DataStructs.FingerprintSimilarity(targ_fp, smiles_fp)
+            scores.append(sim)
+        except:
+            scores.append(float('nan'))
 
     return torch.tensor(scores)
 
