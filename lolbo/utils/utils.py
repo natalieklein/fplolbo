@@ -28,11 +28,7 @@ def update_models_end_to_end(
         for batch_ix in range(num_batches):
             start_idx, stop_idx = batch_ix * bsz, (batch_ix + 1) * bsz
             batch_list = train_x[start_idx:stop_idx]
-            with torch.cuda.amp.autocast():
-                z, vae_loss = objective.vae_forward(batch_list)
-            z = z.float()
-            vae_loss = vae_loss.float()
-
+            z, vae_loss = objective.vae_forward(batch_list)
             batch_y = train_y_scores[start_idx:stop_idx]
             batch_y = torch.tensor(batch_y).float()
             pred = model(z)
