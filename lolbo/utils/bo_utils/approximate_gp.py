@@ -166,7 +166,7 @@ class ApproximateGPyTorchModel(GPyTorchModel):
         if observation_noise:
             dist = self.likelihood(dist, *args, **kwargs)
 
-        return GPyTorchPosterior(mvn=dist)
+        return GPyTorchPosterior(distribution=dist)
 
     def forward(self, X, *args, **kwargs) -> MultivariateNormal:
         X = self.transform_inputs(X)

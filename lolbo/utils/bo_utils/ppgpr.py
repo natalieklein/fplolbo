@@ -40,7 +40,7 @@ class GPModel(ApproximateGP):
         self.likelihood.eval()
         dist = self.likelihood(self(X))
 
-        return GPyTorchPosterior(mvn=dist)
+        return GPyTorchPosterior(distribution=dist)
 
 
 # gp model with deep kernel
@@ -83,4 +83,4 @@ class GPModelDKL(ApproximateGP):
         self.likelihood.eval()
         dist = self.likelihood(self(X))
 
-        return GPyTorchPosterior(mvn=dist)
+        return GPyTorchPosterior(distribution=dist)
