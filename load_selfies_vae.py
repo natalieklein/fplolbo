@@ -13,7 +13,8 @@ Questions:
     - not sure exactly which subset of guacamol they used
 - Is it ok to ignore stereochemistry and stuff? (Not in valid tokens)
     - In theory SELFIES can handle it... maybe we should retrain the VAE with an expanded datset such as PubChem?
-
+- There is a guacamol set in the lolbo repo
+    
 """
 # %%
 from sklearn.manifold import TSNE
@@ -29,6 +30,14 @@ from lolbo.molecule_objective import MoleculeObjective
 np.random.seed(42)
 
 state_path = "lolbo/utils/mol_utils/selfies_vae/state_dict/SELFIES-VAE-state-dict.pt"
+
+def canon_smiles(smiles):
+    new_smiles = []
+    for s in smiles:
+        mol = Chem.MolFromSmiles(s)
+        s = Chem.MolToSmiles(mol)
+        new_smiles.append(s)
+    return new_smiles
 
 #%%
 # has method vae_forward that takes smiles strings
@@ -85,6 +94,9 @@ for cs in cxsmiles:
         else:
             smiles.append(s)
 
+smiles = canon_smiles(smiles)
+smiles = list(set(smiles))
+
 # %% exclude ones that don't match the vocab
 smiles_clean = []
 for smile in smiles:
@@ -93,9 +105,13 @@ for smile in smiles:
         tokens = mo.dataobj.tokenize_selfies([selfie])[0]
         for t in tokens:
             if t not in mo.dataobj.vocab:
+                print(t)
                 raise KeyError
         smiles_clean.append(smile)
-    except:
+    except KeyError as e:
+        print(e)
+        print(smile)
+        print(selfie)
         pass
 
 # %% apply model
@@ -182,6 +198,41 @@ plt.plot(embed_guac[:, 0], embed_guac[:, 1], 'k.', label='Guacamol')
 plt.plot(embed_smiles[:, 0], embed_smiles[:, 1], 'r.', alpha=0.7, label='CWA')
 plt.legend()
 plt.title('PCA')
+plt.show()
+
+# %% Frechet ChemNet distance between guac_smiles samples, smiles_clean (samples?)
+from fcd import get_fcd, load_ref_model, canonical_smiles, get_predictions, calculate_frechet_distance
+# Load chemnet model
+model = load_ref_model()
+cross_fcd_scores = []
+for _ in range(50):
+    # get canonical smiles and filter invalid ones
+    sample1 = np.random.choice(guac_smiles, 100, replace=False)
+    can_sample1 = [w for w in canonical_smiles(sample1) if w is not None]
+    sample2 = np.random.choice(smiles_clean, 100, replace=True)
+    can_sample2 = [w for w in canonical_smiles(sample2) if w is not None]
+
+    fcd_score = get_fcd(can_sample1, can_sample2, model)
+    cross_fcd_scores.append(fcd_score)
+
+# %%
+within_fcd_scores = []
+for _ in range(50):
+    # get canonical smiles and filter invalid ones
+    sample1 = np.random.choice(guac_smiles, 100, replace=False)
+    can_sample1 = [w for w in canonical_smiles(sample1) if w is not None]
+    sample2 = np.random.choice(guac_smiles, 100, replace=True)
+    can_sample2 = [w for w in canonical_smiles(sample2) if w is not None]
+
+    fcd_score = get_fcd(can_sample1, can_sample2, model)
+    within_fcd_scores.append(fcd_score)
+# %%
+
+plt.figure()
+plt.hist(cross_fcd_scores, label='CWA/GuacaMol', alpha=0.7)
+plt.hist(within_fcd_scores, label='GuacaMol/GuacaMol', alpha=0.7)
+plt.legend()
+plt.xlabel('Frechet ChemNet Distance')
 plt.show()
 
 # %%
