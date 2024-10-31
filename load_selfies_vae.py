@@ -27,17 +27,11 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, DataStructs
 from lolbo.molecule_objective import MoleculeObjective
 
+from functions import canon_smiles, load_cwa_smiles
+
 np.random.seed(42)
 
 state_path = "lolbo/utils/mol_utils/selfies_vae/state_dict/SELFIES-VAE-state-dict.pt"
-
-def canon_smiles(smiles):
-    new_smiles = []
-    for s in smiles:
-        mol = Chem.MolFromSmiles(s)
-        s = Chem.MolToSmiles(mol)
-        new_smiles.append(s)
-    return new_smiles
 
 #%%
 # has method vae_forward that takes smiles strings
@@ -73,29 +67,7 @@ guac_pred = mo.vae_decode(guac_r)
 #    r, _ = mo.vae_forward([gc])
 #    guac_pred.append(mo.vae_decode(r)[0])
 
-
-# %% load CWA DB file
-df = pd.read_excel('data/CWA-DB.xlsx')
-smiles = list(df['SMILES'])
-smiles = [s.replace('@','') for s in smiles]
-
-# %% load OCAD SMILES Williams file
-df = pd.read_excel('data/CWA_SMILES-Williams.xlsx')
-cxsmiles = list(df['Smiles (CXSmiles)'])
-for cs in cxsmiles:
-    mol = Chem.MolFromSmiles(cs)
-    if mol is not None:
-        s = Chem.MolToSmiles(mol).replace('/','').replace('\\','')
-
-        if '.' in s:
-            s_split = s.split('.')
-            for sp in s_split:
-                smiles.append(sp)
-        else:
-            smiles.append(s)
-
-smiles = canon_smiles(smiles)
-smiles = list(set(smiles))
+smiles = load_cwa_smiles()
 
 # %% exclude ones that don't match the vocab
 smiles_clean = []
